@@ -1,2 +1,4 @@
-
-int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
+/* client.c */
+int get_address(void);
+int connect_client(char *, int *);
+int client_recv(int *);
