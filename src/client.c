@@ -17,6 +17,10 @@
 #define PORT "3490" // the port client will be connecting to
 #define MAXDATASIZE 100 // max number of bytes client can receive at once
 
+int get_address(void);
+int connect_client(char *, int *);
+int client_recv(int *);
+
 static struct addrinfo hints, *servinfo, *p;
 
 /* initiate client connection
@@ -61,7 +65,7 @@ int get_address(void) {
   hints.ai_socktype = SOCK_STREAM; //TCP stream sockets
 
   // servinfo points to (linkedlist) results from getaddrinfo
-  return getaddrinfo(NULL, "3490", &hints, &servinfo);
+  return getaddrinfo(NULL, "5000", &hints, &servinfo);
 }
 
 int connect_client(char *s, int *client_sockfd) {
