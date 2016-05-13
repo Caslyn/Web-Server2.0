@@ -13,7 +13,7 @@
 #include "headerfile.h"
 
 #define PORT "5000" // the port clients will be connecting to
-#define BACKLOG 10 
+#define BACKLOG 10
 
 static struct addrinfo hints, *servinfo, *p;
 static struct sockaddr_storage client_addr; // clients address information
@@ -46,7 +46,7 @@ int get_address(void) {
   if ((rv = getaddrinfo(NULL,  PORT, &hints, &servinfo)) != 0) {
      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
      return 1;
-  } 
+  }
   return 0;
 }
 
@@ -106,9 +106,10 @@ int accept_connection(int *sockfd) {
   while(1) {
      sin_size = sizeof(client_addr);
      new_fd = accept(*sockfd, (struct sockaddr *) &client_addr, &sin_size);
+
      if (new_fd == -1) {
         perror("accept");
-        continue;
+        return -1;
      }
 
      inet_ntop(client_addr.ss_family, get_in_addr((struct sockaddr *) &client_addr), s, sizeof(s));
@@ -119,8 +120,9 @@ int accept_connection(int *sockfd) {
        if (send(new_fd, "Hello, world!", 13, 0) == -1) {
           perror("send");
           close(new_fd);
-          exit(0);
+          return -1;
        }
+       exit(0);
      }
      close(new_fd); // parent doesn't need the new fd
   }
