@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -41,7 +42,7 @@ int create_socket(int *sockfd){
 
   if ((rv = getaddrinfo(NULL,  PORT, &hints, &servinfo)) != 0) {
      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-     return 1;
+     exit(0);
   }
 
   // loop through all the results and bind the first we can
@@ -52,7 +53,8 @@ int create_socket(int *sockfd){
      }
 
      if (setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-         perror("setsockopt");
+       close(*sockfd);  
+       perror("setsockopt");
          continue;
      }
 
@@ -67,6 +69,7 @@ int create_socket(int *sockfd){
 
   if (p == NULL){
      fprintf(stderr, "server:failed to bind\n");
+     exit(1);
      return -1;
   }
   return 0;
