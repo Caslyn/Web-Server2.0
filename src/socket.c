@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +13,15 @@
 #define BACKLOG 10
 #define PORT "5000" // the port clients will be connecting to
 
-static struct addrinfo *hints, *servinfo, *p;
+static struct addrinfo hints, *servinfo, *p;
+
+// get sockadr, IPv4 or IPv6:
+void *get_client_addr(struct sockaddr *sa) {
+  if (sa->sa_family == AF_INET) {
+     return &(((struct sockaddr_in*) sa)->sin_addr);
+  }
+  return &(((struct sockaddr_in6*) sa)->sin6_addr);
+}
 
 static void sigchld_handler(int s) {
   // waitpid() might overwrite errno, so we save and restor it:
@@ -22,11 +31,18 @@ static void sigchld_handler(int s) {
   errno = saved_errno;
 }
 
-int listen_on_socket(int *sockfd){
-  int yes = 1;
-  struct sigaction sa; // signal struct
+int create_socket(int *sockfd){
+  int yes = 1, rv;
 
-  get_serv_addr(hints, servinfo);
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+
+  if ((rv = getaddrinfo(NULL,  PORT, &hints, &servinfo)) != 0) {
+     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+     return 1;
+  }
 
   // loop through all the results and bind the first we can
   for (p = servinfo; p != NULL; p = p->ai_next) {
@@ -37,7 +53,7 @@ int listen_on_socket(int *sockfd){
 
      if (setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
          perror("setsockopt");
-         return -1;
+         continue;
      }
 
      if (bind(*sockfd, p->ai_addr, p->ai_addrlen) == -1) {
@@ -53,6 +69,11 @@ int listen_on_socket(int *sockfd){
      fprintf(stderr, "server:failed to bind\n");
      return -1;
   }
+  return 0;
+}
+
+int listen_on_socket(int *sockfd){
+  struct sigaction sa; // signal struct
 
   if (listen(*sockfd, BACKLOG) == -1) {
     perror("listen");
@@ -62,6 +83,7 @@ int listen_on_socket(int *sockfd){
   sa.sa_handler = sigchld_handler; // reap zombie processes
   sigemptyset(&sa.sa_mask); // initiazes the signal to be empty
   sa.sa_flags = SA_RESTART; // restart the system call if possible
+
   if(sigaction(SIGCHLD, &sa, NULL) == -1) {
      perror("sigaction");
      return -1;
@@ -71,25 +93,3 @@ int listen_on_socket(int *sockfd){
   return 0;
 }
 
-// get sockadr, IPv4 or IPv6:
-void *get_client_addr(struct sockaddr *sa) {
-  if (sa->sa_family == AF_INET) {
-     return &(((struct sockaddr_in*) sa)->sin_addr);
-  }
-  return &(((struct sockaddr_in6*) sa)->sin6_addr);
-}
-
-int get_serv_addr(struct addrinfo *hints, struct addrinfo *servinfo) {
-  int rv;
-
-  memset(hints, 0, sizeof(*hints));
-  hints->ai_family = AF_UNSPEC;
-  hints->ai_socktype = SOCK_STREAM;
-  hints->ai_flags = AI_PASSIVE; // use my IP
-
-  if ((rv = getaddrinfo(NULL,  PORT, hints, &servinfo)) != 0) {
-     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-     return 1;
-  }
-  return 0;
-}
