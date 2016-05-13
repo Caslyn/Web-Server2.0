@@ -3,7 +3,7 @@
 int main() {
   int sockfd;
 
-  if(connect_server(&sockfd) == -1) {
+  if(listen_on_socket(&sockfd) == -1) {
      return 1;
   }
 
