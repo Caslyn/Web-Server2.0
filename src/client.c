@@ -14,7 +14,7 @@
 #include <unistd.h>
 #include "headerfile.h"
 
-#define PORT "3490" // the port client will be connecting to
+#define PORT "5000" // the port client will be connecting to
 #define MAXDATASIZE 100 // max number of bytes client can receive at once
 
 int get_address(void);
@@ -65,7 +65,7 @@ int get_address(void) {
   hints.ai_socktype = SOCK_STREAM; //TCP stream sockets
 
   // servinfo points to (linkedlist) results from getaddrinfo
-  return getaddrinfo(NULL, "5000", &hints, &servinfo);
+  return getaddrinfo(NULL, PORT, &hints, &servinfo);
 }
 
 int connect_client(char *s, int *client_sockfd) {
@@ -88,7 +88,7 @@ int connect_client(char *s, int *client_sockfd) {
     return 1;
   }
 
-  inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof(s));
+  inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, INET6_ADDRSTRLEN);
   freeaddrinfo(servinfo); // all done with this structure
   return 0;
 }
