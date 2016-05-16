@@ -4,8 +4,6 @@
 #include <unistd.h>
 #include "headerfile.h"
 
-#define PORT "5000" // the port clients will be connecting to
-
 static struct sockaddr_storage client_addr; // clients address information
 static socklen_t sin_size;
 
