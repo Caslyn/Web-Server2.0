@@ -55,8 +55,7 @@ int parse_headers(req *req) {
      char *s = req->content, *e;
 
      while(*s++ && !isspace(*s)); // skip over method
-     s+=2;
-     e = s;
+     e = (s+=2); // skip over ' ' & '/' 
      while(*e++ && !isspace(*e)); //capturing url
      req->url = malloc(e - s);
 
