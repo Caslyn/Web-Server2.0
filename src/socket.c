@@ -36,7 +36,8 @@ static void sigchld_handler(int s) {
   errno = saved_errno;
 }
 
-int create_socket(int *sockfd){
+int create_socket(void){
+  int sockfd;
   int yes = 1, rv;
 
   memset(&hints, 0, sizeof(hints));
@@ -51,19 +52,19 @@ int create_socket(int *sockfd){
 
   // loop through all the results and bind the first we can
   for (p = servinfo; p != NULL; p = p->ai_next) {
-     if((*sockfd  = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+     if((sockfd  = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
         perror("server: socket");
         continue;
      }
 
-     if (setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-       close(*sockfd);  
+     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+       close(sockfd);  
        perror("setsockopt");
          continue;
      }
 
-     if (bind(*sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-        close(*sockfd);
+     if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+        close(sockfd);
         perror("server:bind");
         continue;
      }

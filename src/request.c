@@ -10,11 +10,6 @@
 #include <unistd.h>
 #include "headerfile.h"
 
-typedef struct req {
-   char *url;
-   char *content;
-} req;
-
 int serve_request(int sockfd)
 {
   req *req= malloc(sizeof(req));
@@ -55,7 +50,7 @@ int read_request(int sockfd, req *req){
      return 0;
  }
  
- int parse_request(req *req) {
+int parse_headers(req *req) {
      char *s = req->content, *e;
 
      while(s++ && !isspace(*(req->content++))); // skip over method
