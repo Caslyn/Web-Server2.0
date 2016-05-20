@@ -25,29 +25,30 @@ int serve_request(int sockfd)
 }
 
 int read_request(int sockfd, req *req){
-     int bytes_recv, cp = 0;
-     char content_buf[CONTENT_LEN];
-     size_t chunk_size = CONTENT_LEN; //TODO: understand what size_t is
-     req->content = malloc(chunk_size);
+   int bytes_recv, cp = 0;
+   char content_buf[CONTENT_LEN];
+   size_t initial_len = CONTENT_LEN; //TODO: understand what size_t is
+   req->content = malloc(initial_len);
 
-     while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)))  {
-       if (bytes_recv + cp > chunk_size) { // check if we have run out room in our content buffer
-         chunk_size *= 2; // double size
-         char *tmp = realloc(req->content, chunk_size);
-         if (tmp) {
-            req->content = tmp; 
-         } else {
-            // memory allocation failure
-            free(req->content);
-            cp = 0;
-            break;
-         }
+   if ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > 0)  {
+     printf("Received %d Bytes..\n", bytes_recv);
+     if (bytes_recv + cp > initial_len) { // check if we have run out room in our content buffer
+       initial_len *= 2; // double size
+       char *tmp = realloc(req->content, initial_len);
+       if (tmp) {
+          req->content = tmp; 
+       } else {
+          // memory allocation failure
+          free(req->content);
+          cp = 0;
        }
-       memcpy(req->content + cp, content_buf, bytes_recv);
      }
+     memcpy(req->content + cp, content_buf, bytes_recv);
+     cp += bytes_recv;
+   }
 
-     printf("%s", req->content);
-     return 0;
+   printf("%s", req->content);
+   return 0;
  }
  
 int parse_headers(req *req) {
@@ -71,7 +72,6 @@ int parse_headers(req *req) {
   int write_response(int sockfd, req *req){
     int file;
     char real_path[HEADER_LEN];
-    printf("req->url: %s\n", req->url);
     realpath(req->url, real_path);
     printf("URL: %s\n", real_path);
 

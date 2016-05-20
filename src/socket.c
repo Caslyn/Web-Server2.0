@@ -126,9 +126,8 @@ int accept_connection(int sockfd) {
           return -1;
        }
        exit(0);
-     } else {
-       close(new_fd); // parent doesn't need the new fd
      }
+     close(new_fd); // parent doesn't need the new fd
   }
   return 0;
 }
