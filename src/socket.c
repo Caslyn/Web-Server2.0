@@ -58,7 +58,7 @@ int create_socket(void){
      }
 
      if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-       close(sockfd);  
+       close(sockfd);
        perror("setsockopt");
          continue;
      }
@@ -117,10 +117,9 @@ int accept_connection(int sockfd) {
      inet_ntop(client_addr.ss_family, get_client_addr((struct sockaddr *) &client_addr), s, sizeof(s));
      printf("server: got connection from %s\n", s);
 
-     if ((pid = fork()) != 0) { // this is the child process//     
+     if ((pid = fork()) != 0) { // this is the child process//
        printf("Spawning Child %d\n", pid);
        close(sockfd); // child doesn't need the listening socket
-       serve_request(new_fd);
        if (serve_request(new_fd) == -1) {
           perror("send");
           close(new_fd);

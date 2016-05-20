@@ -15,12 +15,13 @@ int serve_request(int sockfd)
   req *req= malloc(sizeof(req));
 
   read_request(sockfd, req);
+  parse_headers(req); 
   write_response(sockfd, req);
 
-   free(req->url);
-   free(req->content);
-   free(req);
-   return 0;
+  free(req->url);
+  free(req->content);
+  free(req);
+  return 0;
 }
 
 int read_request(int sockfd, req *req){
@@ -45,7 +46,6 @@ int read_request(int sockfd, req *req){
        memcpy(req->content + cp, content_buf, bytes_recv);
      }
 
-     parse_headers(req); // parse request, passing in content
      printf("%s", req->content);
      return 0;
  }
@@ -53,48 +53,49 @@ int read_request(int sockfd, req *req){
 int parse_headers(req *req) {
      char *s = req->content, *e;
 
-     while(s++ && !isspace(*(req->content++))); // skip over method
+     while(*s++ && !isspace(*s)); // skip over method
+     s+=2;
      e = s;
-     while(e++ && !isspace(*(req->content++))); //capturing url
-     req->url = malloc(e - s + 1);
+     while(*e++ && !isspace(*e)); //capturing url
+     req->url = malloc(e - s);
 
      if (req->url == NULL) {
         // memory allocation failure
         free(req->url);
+        return -1;
      }
 
      memcpy(req->url, s, e-s);
-     printf("URL: %s\n", req->url);
      return 0;
  }
-  int write_response(int sockfd, req *request){
-       int file;
-       char actualpath[HEADER_LEN] = "../assets/";
-       strcat(actualpath, request->url);
-        char path[HEADER_LEN];
+  int write_response(int sockfd, req *req){
+    int file;
+    char real_path[HEADER_LEN];
+    printf("req->url: %s\n", req->url);
+    realpath(req->url, real_path);
+    printf("URL: %s\n", real_path);
 
-        char *pathptr = realpath(actualpath, path);
-        printf("Locating File: %s\n", actualpath);
-        if ((file = open(pathptr, O_RDONLY)) >= 0) {
-          if (!send_file(file, sockfd)) {
-           return 0;
-          }
-        } else {
-          printf("File Not Found\n");
-          file = open("../assets/notfound.html", O_RDONLY);
-          send_file(file, sockfd);
-        }
-        return 0;
+    if ((file = open(real_path, O_RDONLY)) >= 0) {
+      if (!send_file(file, sockfd)) {
+       printf("Sent Requested File\n");
+       return 0;
+      }
+    } else {
+      printf("File Not Found\n");
+      file = open("notfound.html", O_RDONLY);
+      send_file(file, sockfd);
+    }
+    return 0;
   }
 
 int send_file(int file, int sockfd) {
-       struct stat st;
-       fstat(file, &st);
-       off_t offset = 0, size = st.st_size;
-       if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
-           printf("Error Sending File\n");
-           return -1;
-       }
-       close(file);
-       return 0;
+   struct stat st;
+   fstat(file, &st);
+   off_t offset = 0, size = st.st_size;
+   if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
+       printf("Error Sending File\n");
+       return -1;
+   }
+   close(file);
+   return 0;
 }
