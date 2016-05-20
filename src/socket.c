@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -14,10 +15,13 @@
 #define BACKLOG 10
 #define PORT "5000" // the port clients will be connecting to
 
+static void *get_client_addr(struct sockaddr *);
 static struct addrinfo hints, *servinfo, *p;
+static struct sockaddr_storage client_addr; // clients address information
+static socklen_t sin_size;
 
 // get sockadr, IPv4 or IPv6:
-void *get_client_addr(struct sockaddr *sa) {
+static void *get_client_addr(struct sockaddr *sa) {
   if (sa->sa_family == AF_INET) {
      return &(((struct sockaddr_in*) sa)->sin_addr);
   }
@@ -72,13 +76,13 @@ int create_socket(int *sockfd){
      exit(1);
      return -1;
   }
-  return 0;
+  return sockfd;
 }
 
-int listen_on_socket(int *sockfd){
+int begin_listening(int sockfd){
   struct sigaction sa; // signal struct
 
-  if (listen(*sockfd, BACKLOG) == -1) {
+  if (listen(sockfd, BACKLOG) == -1) {
     perror("listen");
     return -1;
   }
@@ -96,3 +100,35 @@ int listen_on_socket(int *sockfd){
   return 0;
 }
 
+int accept_connection(int sockfd) {
+  int new_fd, pid;
+  char s[INET6_ADDRSTRLEN];
+
+  while(1) {
+     sin_size = sizeof(client_addr);
+     new_fd = accept(sockfd, (struct sockaddr *) &client_addr, &sin_size);
+
+     if (new_fd == -1) {
+        perror("accept");
+        return -1;
+     }
+
+     inet_ntop(client_addr.ss_family, get_client_addr((struct sockaddr *) &client_addr), s, sizeof(s));
+     printf("server: got connection from %s\n", s);
+
+     if ((pid = fork()) != 0) { // this is the child process//     
+       printf("Spawning Child %d\n", pid);
+       close(sockfd); // child doesn't need the listening socket
+       serve_request(new_fd);
+       if (serve_request(new_fd) == -1) {
+          perror("send");
+          close(new_fd);
+          return -1;
+       }
+       exit(0);
+     } else {
+       close(new_fd); // parent doesn't need the new fd
+     }
+  }
+  return 0;
+}

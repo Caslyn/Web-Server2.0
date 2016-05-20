@@ -3,15 +3,15 @@
 int main() {
   int sockfd;
 
-  if(create_socket(&sockfd) == -1) {
+  if((sockfd = create_socket()) == -1) {
      return 1;
   }
   
-  if(listen_on_socket(&sockfd) == -1) {
+  if(begin_listening(sockfd) == -1) {
      return 1;
   }
 
-  if(accept_connection(&sockfd) == -1) {
+  if(accept_connection(sockfd) == -1) {
      return 1;
   }
 

@@ -1,13 +1,21 @@
-#include <netdb.h>
-#include <netinet/in.h>
-#include "listener.c"
-
-/* server.c */
 
 /* socket.c */
-int create_socket(int *);
-int listen_on_socket(int *);
-int accept_connection(int *);
+int create_socket(void);
+int begin_listening(int);
+int accept_connection(int);
 
-/* listener.c */
-void *get_client_addr(struct sockaddr *);
+/* request.c */
+#define HEADER_LEN 4096
+#define CONTENT_LEN 4096 
+
+typedef struct req {
+   char *method;
+   char *url;
+   char *content;
+} req;
+
+int serve_request(int);
+int read_request(int, struct req *);
+int parse_headers(struct req *);
+int write_response(int, struct req *);
+int send_file(int, int);
