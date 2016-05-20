@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -9,13 +10,14 @@
 #include <unistd.h>
 #include "headerfile.h"
 
-typedef struct Request {
+typedef struct req {
    char *url;
    char *content;
-} Request;
+} req;
 
-int serve_request(int sockfd) {.
-  Request *req= malloc(sizeof(req));
+int serve_request(int sockfd)
+{
+  req *req= malloc(sizeof(req));
 
   read_request(sockfd, req);
   write_response(sockfd, req);
@@ -24,21 +26,21 @@ int serve_request(int sockfd) {.
    free(req->content);
    free(req);
    return 0;
- }
- 
- int read_request(int sockfd, Request *req){
+}
+
+int read_request(int sockfd, req *req){
      int bytes_recv, cp = 0;
-     char content_buf[CONTENT_LEN]; 
+     char content_buf[CONTENT_LEN];
      size_t chunk_size = CONTENT_LEN; //TODO: understand what size_t is
      req->content = malloc(chunk_size);
-      
-     while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > {
+
+     while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)))  {
        if (bytes_recv + cp > chunk_size) { // check if we have run out room in our content buffer
          chunk_size *= 2; // double size
          char *tmp = realloc(req->content, chunk_size);
          if (tmp) {
-            req->content = tmp; 3         
-        } else {
+            req->content = tmp; 
+         } else {
             // memory allocation failure
             free(req->content);
             cp = 0;
@@ -46,20 +48,19 @@ int serve_request(int sockfd) {.
          }
        }
        memcpy(req->content + cp, content_buf, bytes_recv);
-       cp += bytes_recv;
      }
 
-     parse_request(req); // parse request, passing in content
+     parse_headers(req); // parse request, passing in content
      printf("%s", req->content);
      return 0;
  }
  
- int parse_request(Request *req) {
+ int parse_request(req *req) {
      char *s = req->content, *e;
 
-     while(s++ && !isspace(req->content++)); // skip over method
+     while(s++ && !isspace(*(req->content++))); // skip over method
      e = s;
-     while(e++ && !isspace(req->content++)); //capturing url
+     while(e++ && !isspace(*(req->content++))); //capturing url
      req->url = malloc(e - s + 1);
 
      if (req->url == NULL) {
@@ -67,16 +68,15 @@ int serve_request(int sockfd) {.
         free(req->url);
      }
 
-     memcpy(req-url, s, e-s);
-     *(req->url + e-s) = '\0';
-     print("URL: %s\n", *req->url)
+     memcpy(req->url, s, e-s);
+     printf("URL: %s\n", req->url);
      return 0;
  }
-  int write_response(int sockfd, Request *request){
+  int write_response(int sockfd, req *request){
        int file;
-       char actualpath[MAX_HEADER_LEN] = "../assets/";
+       char actualpath[HEADER_LEN] = "../assets/";
        strcat(actualpath, request->url);
-        char path[MAX_HEADER_LEN];
+        char path[HEADER_LEN];
 
         char *pathptr = realpath(actualpath, path);
         printf("Locating File: %s\n", actualpath);
@@ -91,8 +91,8 @@ int serve_request(int sockfd) {.
         }
         return 0;
   }
-  
-  int send_file(int file, int sockfd) {
+
+int send_file(int file, int sockfd) {
        struct stat st;
        fstat(file, &st);
        off_t offset = 0, size = st.st_size;
@@ -102,5 +102,4 @@ int serve_request(int sockfd) {.
        }
        close(file);
        return 0;
-   }
-    
+}
