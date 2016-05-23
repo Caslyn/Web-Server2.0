@@ -63,6 +63,8 @@ int create_socket(void){
          continue;
      }
 
+     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(struct timeval)); 
+
      if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
         close(sockfd);
         perror("server:bind");
@@ -118,7 +120,7 @@ int accept_connection(int sockfd) {
      printf("server: got connection from %s\n", s);
 
      if ((pid = fork()) != 0) { // this is the child process//
-       printf("Spawning Child %d\n", pid);
+       printf("Spawning Child %d\n\n", pid);
        close(sockfd); // child doesn't need the listening socket
        if (serve_request(new_fd) == -1) {
           perror("send");

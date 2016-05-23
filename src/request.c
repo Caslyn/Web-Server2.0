@@ -27,30 +27,35 @@ int serve_request(int sockfd)
 int read_request(int sockfd, req *req){
    int bytes_recv, cp = 0;
    char content_buf[CONTENT_LEN];
-   size_t initial_len = CONTENT_LEN; //TODO: understand what size_t is
+   size_t initial_len = CONTENT_LEN;
    req->content = malloc(initial_len);
 
-   if ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > 0)  {
-     printf("Received %d Bytes..\n", bytes_recv);
-     if (bytes_recv + cp > initial_len) { // check if we have run out room in our content buffer
-       initial_len *= 2; // double size
-       char *tmp = realloc(req->content, initial_len);
-       if (tmp) {
-          req->content = tmp; 
-       } else {
+   while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > 0) {
+     if (bytes_recv + cp >= initial_len) { // exceed storage allocation capacity
+        initial_len *= 2; // double size
+        char *tmp = realloc(req->content, initial_len);
+        if (tmp) {
+           req->content = tmp;
+        } else {
           // memory allocation failure
           free(req->content);
           cp = 0;
        }
+      memcpy(req->content + cp, content_buf, bytes_recv);
+      cp += bytes_recv;
+     } else if (bytes_recv < CONTENT_LEN) { // we have recieved the end of the request
+      memcpy(req->content + cp, content_buf, bytes_recv);
+      break;
+     } else {  // we have enough storage but have not recieved the end of the request
+      memcpy(req->content + cp, content_buf, bytes_recv);
+      cp += bytes_recv;
      }
-     memcpy(req->content + cp, content_buf, bytes_recv);
-     cp += bytes_recv;
    }
 
-   printf("%s", req->content);
+   printf("%s\n", req->content);
    return 0;
- }
- 
+}
+
 int parse_headers(req *req) {
      char *s = req->content, *e;
 
@@ -58,7 +63,6 @@ int parse_headers(req *req) {
      e = (s+=2); // skip over ' ' & '/' 
      while(*e++ && !isspace(*e)); //capturing url
      req->url = malloc(e - s);
-
      if (req->url == NULL) {
         // memory allocation failure
         free(req->url);
@@ -66,6 +70,7 @@ int parse_headers(req *req) {
      }
 
      memcpy(req->url, s, e-s);
+     req->url[e-s] = '\0';
      return 0;
  }
   int write_response(int sockfd, req *req){
@@ -76,11 +81,11 @@ int parse_headers(req *req) {
 
     if ((file = open(real_path, O_RDONLY)) >= 0) {
       if (!send_file(file, sockfd)) {
-       printf("Sent Requested File\n");
+       printf("Sent Requested File\n\n");
        return 0;
       }
     } else {
-      printf("File Not Found\n");
+      printf("File Not Found\n\n");
       file = open("notfound.html", O_RDONLY);
       send_file(file, sockfd);
     }
