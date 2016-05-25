@@ -1,6 +1,8 @@
+#include <errno.h>
 #include <ctype.h>
 #include <netinet/in.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,7 +54,7 @@ int read_request(int sockfd, req *req){
      }
    }
 
-   printf("%s\n", req->content);
+   printf("%s", req->content);
    return 0;
 }
 
@@ -84,7 +86,6 @@ int parse_headers(req *req) {
        printf("Sent Requested File\n\n");
        return 0;
       }
-    } else {
       printf("File Not Found\n\n");
       file = open("notfound.html", O_RDONLY);
       send_file(file, sockfd);
@@ -96,10 +97,23 @@ int send_file(int file, int sockfd) {
    struct stat st;
    fstat(file, &st);
    off_t offset = 0, size = st.st_size;
-   if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
-       printf("Error Sending File\n");
-       return -1;
+   int complete = FALSE;
+
+   while(complete == FALSE) {
+      if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
+         if (errno == EAGAIN) {
+           offset += size;
+           poll_wait(sockfd, POLLOUT | POLLERR);
+           continue;
+         } else {
+          perror("sendfile");
+          return -1;
+         } 
+      } else {
+        complete = TRUE;
+      } 
    }
+
    close(file);
-   return 0;
+   return offset;
 }

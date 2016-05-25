@@ -1,7 +1,9 @@
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,8 +64,12 @@ int create_socket(void){
        perror("setsockopt");
          continue;
      }
-
-     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(struct timeval)); 
+     // set socket to non-blocking
+     if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
+        close(sockfd);
+        perror("fcntl");
+        continue;
+     }
 
      if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
         close(sockfd);
@@ -109,9 +115,9 @@ int accept_connection(int sockfd) {
 
   while(1) {
      sin_size = sizeof(client_addr);
-     new_fd = accept(sockfd, (struct sockaddr *) &client_addr, &sin_size);
 
-     if (new_fd == -1) {
+     poll_wait(sockfd, POLLIN | POLLERR);
+     if((new_fd = accept(sockfd, (struct sockaddr *) &client_addr, &sin_size)) < 0) {
         perror("accept");
         return -1;
      }
