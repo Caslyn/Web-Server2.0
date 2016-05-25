@@ -1,6 +1,7 @@
+#include <errno.h>
 #include <ctype.h>
-#include <netinet/in.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,35 +13,39 @@
 
 int serve_request(int sockfd)
 {
+  int rc;
   req *req= malloc(sizeof(req));
 
-  read_request(sockfd, req);
-  parse_headers(req); 
-  write_response(sockfd, req);
+  if ((rc = read_request(sockfd, req)) <= 0) {
+    free(req->content);
+    free(req);
+  } else {
+    printf("%s\n", req->content);
+    parse_headers(req);
+    write_response(sockfd, req);
+    clean_request(req);
+  }
+  return rc;
+}
 
+void clean_request(req *req) {
   free(req->url);
   free(req->content);
   free(req);
-  return 0;
 }
 
 int read_request(int sockfd, req *req){
-   int bytes_recv, cp = 0;
+   int bytes_recv,total_bytes = 0, cp = 0;
    char content_buf[CONTENT_LEN];
    size_t initial_len = CONTENT_LEN;
-   req->content = malloc(initial_len);
+   req->content = calloc(1, initial_len);
 
    while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > 0) {
+     total_bytes += bytes_recv;
      if (bytes_recv + cp >= initial_len) { // exceed storage allocation capacity
-        initial_len *= 2; // double size
-        char *tmp = realloc(req->content, initial_len);
-        if (tmp) {
-           req->content = tmp;
-        } else {
-          // memory allocation failure
-          free(req->content);
-          cp = 0;
-       }
+      initial_len *= 2; // double size
+      char *tmp = realloc(req->content, initial_len);
+      req->content = tmp;
       memcpy(req->content + cp, content_buf, bytes_recv);
       cp += bytes_recv;
      } else if (bytes_recv < CONTENT_LEN) { // we have recieved the end of the request
@@ -51,26 +56,21 @@ int read_request(int sockfd, req *req){
       cp += bytes_recv;
      }
    }
-
-   printf("%s\n", req->content);
-   return 0;
+   return total_bytes;
 }
 
 int parse_headers(req *req) {
      char *s = req->content, *e;
 
      while(*s++ && !isspace(*s)); // skip over method
-     e = (s+=2); // skip over ' ' & '/' 
+     e = (s+=2); // skip over ' ' & '/'
      while(*e++ && !isspace(*e)); //capturing url
-     req->url = malloc(e - s);
+     req->url = calloc(1,e - s);
      if (req->url == NULL) {
-        // memory allocation failure
-        free(req->url);
         return -1;
      }
 
      memcpy(req->url, s, e-s);
-     req->url[e-s] = '\0';
      return 0;
  }
   int write_response(int sockfd, req *req){
