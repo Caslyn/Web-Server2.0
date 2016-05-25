@@ -97,8 +97,8 @@ int send_file(int file, int sockfd) {
    fstat(file, &st);
    off_t offset = 0, size = st.st_size;
    if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
-       printf("Error Sending File\n");
-       return -1;
+     perror("Sendfile\n");
+     return -1;
    }
    close(file);
    return 0;
