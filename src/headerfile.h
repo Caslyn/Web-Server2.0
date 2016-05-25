@@ -38,3 +38,8 @@ typedef struct thread_pool {
 
 thread_pool *build_thread_pool(void);
 void init_worker_thread(thread_pool *thread_pool);
+
+/* poll.c */
+#define TRUE 1
+#define FALSE 0
+void poll_wait(int, int);
