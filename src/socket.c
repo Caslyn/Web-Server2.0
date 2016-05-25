@@ -1,6 +1,5 @@
 #include <arpa/inet.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <signal.h>
@@ -64,12 +63,7 @@ int create_socket(void){
          continue;
      }
 
-     if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
-       close(sockfd);
-       perror("fcntl");
-       continue;
-     }
-
+     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(struct timeval)); 
 
      if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
         close(sockfd);
@@ -96,6 +90,15 @@ int begin_listening(int sockfd){
     return -1;
   }
 
+  sa.sa_handler = sigchld_handler; // reap zombie processes
+  sigemptyset(&sa.sa_mask); // initiazes the signal to be empty
+  sa.sa_flags = SA_RESTART; // restart the system call if possible
+
+  if(sigaction(SIGCHLD, &sa, NULL) == -1) {
+     perror("sigaction");
+     return -1;
+  }
+
   printf("server: waiting for connection...\n");
   return 0;
 }
@@ -104,9 +107,29 @@ int accept_connection(int sockfd) {
   int new_fd, pid;
   char s[INET6_ADDRSTRLEN];
 
-  sin_size = sizeof(client_addr);
-  new_fd = accept(sockfd, (struct sockaddr *) &client_addr, &sin_size);
-  inet_ntop(client_addr.ss_family, get_client_addr((struct sockaddr *) &client_addr), s, sizeof(s));
-  printf("server: got connection from %s\n", s);
-  return new_fd;
+  while(1) {
+     sin_size = sizeof(client_addr);
+     new_fd = accept(sockfd, (struct sockaddr *) &client_addr, &sin_size);
+
+     if (new_fd == -1) {
+        perror("accept");
+        return -1;
+     }
+
+     inet_ntop(client_addr.ss_family, get_client_addr((struct sockaddr *) &client_addr), s, sizeof(s));
+     printf("server: got connection from %s\n", s);
+
+     if ((pid = fork()) != 0) { // this is the child process//
+       printf("Spawning Child %d\n\n", pid);
+       close(sockfd); // child doesn't need the listening socket
+       if (serve_request(new_fd) == -1) {
+          perror("send");
+          close(new_fd);
+          return -1;
+       }
+       exit(0);
+     }
+     close(new_fd); // parent doesn't need the new fd
+  }
+  return 0;
 }
