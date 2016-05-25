@@ -34,7 +34,7 @@ typedef struct thread_pool {
   pthread_mutex_t thread_lock; // lock so one thread can have exclusive access
   pthread_cond_t signal; // conditional signal to lock/unlock
   pthread_t *threads; // threads in thread pool
-} thread_pool
+} thread_pool;
 
 thread_pool *build_thread_pool(void);
 void init_worker_thread(thread_pool *thread_pool);
