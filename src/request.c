@@ -37,6 +37,7 @@ int read_request(int sockfd, req *req){
         initial_len *= 2; // double size
         char *tmp = realloc(req->content, initial_len);
         if (tmp) {
+           printf("..allocating more storage for request...\n");
            req->content = tmp;
         } else {
           // memory allocation failure
@@ -102,7 +103,8 @@ int send_file(int file, int sockfd) {
    while(complete == FALSE) {
       if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
          if (errno == EAGAIN) {
-           offset += size;
+           printf("Wrote %zd bytes to socket\n", size);
+           offset+=size;
            poll_wait(sockfd, POLLOUT | POLLERR);
            continue;
          } else {
