@@ -20,14 +20,17 @@ int write_response(int, req *);
 int send_file(int, int);
 
 /* thread.c */
+#include <pthread.h>
 #define MAX_THREADS 10
 #define MAX_CONNECTIONS 100
+#define MAX_JOBS 10
 
 // custom attribute for each thread
 typedef struct job_queue {
  int head; // pointer to beginning of queue
  int tail; // pointer to the next available place in queue
  int count; // number of jobs
+ char *jobs; // jobs in job queue
 } job_queue;
 
 typedef struct thread_pool {

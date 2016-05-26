@@ -1,4 +1,3 @@
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/poll.h>
@@ -30,7 +29,6 @@ void init_worker_thread(thread_pool *t_pool) {
   int job; 
   job_queue *job_q;
   job_q = malloc(sizeof(job_queue));
-  job_q->tid = pthread_self();
   job_q->head = 0;
   job_q->tail = 0;
   job_q->count = 0;

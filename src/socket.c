@@ -133,6 +133,7 @@ int accept_connection(int sockfd) {
           close(new_fd);
           return -1;
        }
+       printf("Child %d completed request\n", pid);
        exit(0);
      }
      close(new_fd); // parent doesn't need the new fd

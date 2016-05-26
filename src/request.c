@@ -13,16 +13,23 @@
 #include "headerfile.h"
 
 int serve_request(int sockfd)
-{
+{ 
+  int rc;
   req *req= malloc(sizeof(req));
 
-  read_request(sockfd, req);
-  parse_headers(req); 
-  write_response(sockfd, req);
-
-  free(req->url);
-  free(req->content);
-  free(req);
+  if((rc = read_request(sockfd, req)) <= 0) {
+    free(req->content);
+    free(req);
+    return -1;
+  } else {
+    printf("%s\n", req->content);
+    parse_headers(req); 
+    write_response(sockfd, req);
+    // clean up
+    free(req->url);
+    free(req->content);
+    free(req);
+  }
   return 0;
 }
 
@@ -54,9 +61,7 @@ int read_request(int sockfd, req *req){
       cp += bytes_recv;
      }
    }
-
-   printf("%s", req->content);
-   return 0;
+   return bytes_recv;
 }
 
 int parse_headers(req *req) {
@@ -65,15 +70,14 @@ int parse_headers(req *req) {
      while(*s++ && !isspace(*s)); // skip over method
      e = (s+=2); // skip over ' ' & '/' 
      while(*e++ && !isspace(*e)); //capturing url
-     req->url = malloc(e - s);
+     req->url = calloc(1, e - s);
      if (req->url == NULL) {
         // memory allocation failure
-        free(req->url);
-        return -1;
+       free(req->url);
+       return -1;
      }
 
      memcpy(req->url, s, e-s);
-     req->url[e-s] = '\0';
      return 0;
  }
   int write_response(int sockfd, req *req){
@@ -82,15 +86,15 @@ int parse_headers(req *req) {
     realpath(req->url, real_path);
     printf("URL: %s\n", real_path);
 
-    if ((file = open(real_path, O_RDONLY)) >= 0) {
-      if (!send_file(file, sockfd)) {
-       printf("Sent Requested File\n\n");
-       return 0;
-      }
+    // could not open file
+    if ((file = open(real_path, O_RDONLY)) < 0) {
       printf("File Not Found\n\n");
       file = open("notfound.html", O_RDONLY);
       send_file(file, sockfd);
-    }
+    } else {
+      printf("Sending Request File\n"); 
+      send_file(file, sockfd);
+    } 
     return 0;
   }
 
@@ -102,14 +106,14 @@ int send_file(int file, int sockfd) {
 
    while(complete == FALSE) {
       if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
-         if (errno == EAGAIN) {
+         if (errno == EWOULDBLOCK) {
            printf("Wrote %zd bytes to socket\n", size);
            offset+=size;
            poll_wait(sockfd, POLLOUT | POLLERR);
            continue;
          } else {
           perror("sendfile");
-          return -1;
+          return 1;
          } 
       } else {
         complete = TRUE;
