@@ -108,35 +108,49 @@ int begin_listening(int sockfd){
   printf("server: waiting for connection...\n");
   return 0;
 }
+// distribute connections to job queues
+int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *jobq_pool){
+  int new_fd, next_job_q, next_job;
+  job_queue *chosen_job_q;
+
+  while(1) {
+    sin_size = sizeof(client_addr);
+    poll_wait(sockfd, POLLIN); // wait for connection
+    printf("A connection is ready to accept\n");
+
+    if((new_fd = accept_connection(sockfd)) < 0) {
+      continue;
+     }
+
+    next_job_q = jobq_pool->tail + 1; // next available job queue
+
+    if (next_job_q == MAX_THREADS) { // If next is the beyond the number of threads(1:1 with job queues), then assign next jobqueue to first
+      next_job_q = 0;
+    }
+   // add connection to the next available job queue
+   chosen_job_q = &jobq_pool->job_queues[jobq_pool->tail]; 
+   next_job = chosen_job_q->tail + 1;
+   if (next_job == MAX_JOBS) {
+      next_job = 0;
+   }
+   // add new_sockfd to the end of the chosen job queue
+   chosen_job_q->jobs[chosen_job_q->tail] = new_fd;
+   chosen_job_q->count++;
+   chosen_job_q->tail = next_job;
+  }
+}
 
 int accept_connection(int sockfd) {
   int new_fd, pid;
   char s[INET6_ADDRSTRLEN];
 
-  while(1) {
-     sin_size = sizeof(client_addr);
+   if((new_fd = accept(sockfd, (struct sockaddr *) &client_addr, &sin_size)) < 0) {
+      perror("accept");
+      return -1;
+   }
 
-     poll_wait(sockfd, POLLIN | POLLERR);
-     if((new_fd = accept(sockfd, (struct sockaddr *) &client_addr, &sin_size)) < 0) {
-        perror("accept");
-        return -1;
-     }
+   inet_ntop(client_addr.ss_family, get_client_addr((struct sockaddr *) &client_addr), s, sizeof(s));
+   printf("server: accepted connection from %s\n", s);
 
-     inet_ntop(client_addr.ss_family, get_client_addr((struct sockaddr *) &client_addr), s, sizeof(s));
-     printf("server: got connection from %s\n", s);
-
-     if ((pid = fork()) != 0) { // this is the child process//
-       printf("Spawning Child %d\n\n", pid);
-       close(sockfd); // child doesn't need the listening socket
-       if (serve_request(new_fd) == -1) {
-          perror("send");
-          close(new_fd);
-          return -1;
-       }
-       printf("Child %d completed request\n", pid);
-       exit(0);
-     }
-     close(new_fd); // parent doesn't need the new fd
-  }
-  return 0;
+  return new_fd;
 }

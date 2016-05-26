@@ -17,7 +17,7 @@ int serve_request(int sockfd)
   int rc;
   req *req= malloc(sizeof(req));
 
-  if((rc = read_request(sockfd, req)) <= 0) {
+  if((rc = read_request(sockfd, req)) <= 0) { // quit if we didn't read any bytes
     free(req->content);
     free(req);
     return -1;
