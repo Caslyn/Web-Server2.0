@@ -14,10 +14,12 @@
 
 int serve_request(int sockfd)
 { 
+  printf("%p is reading socket  %d\n", pthread_self(), sockfd);
   int rc;
   req *req= malloc(sizeof(req));
 
   if((rc = read_request(sockfd, req)) <= 0) { // quit if we didn't read any bytes
+    printf("Couldn't read any bytes\n");
     free(req->content);
     free(req);
     return -1;
@@ -37,9 +39,10 @@ int read_request(int sockfd, req *req){
    int bytes_recv, cp = 0;
    char content_buf[CONTENT_LEN];
    size_t initial_len = CONTENT_LEN;
-   req->content = malloc(initial_len);
-
+   req->content = (char *) malloc(initial_len);
+   printf("about to read request on %d\n", sockfd);
    while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > 0) {
+     printf("%d bytes have been read\n", bytes_recv);
      if (bytes_recv + cp >= initial_len) { // exceed storage allocation capacity
         initial_len *= 2; // double size
         char *tmp = realloc(req->content, initial_len);

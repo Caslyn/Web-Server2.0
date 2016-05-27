@@ -130,6 +130,7 @@ int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *jobq_poo
    // add connection to the next available job queue
    chosen_job_q = &jobq_pool->job_queues[jobq_pool->tail]; 
    next_job = chosen_job_q->tail + 1;
+
    if (next_job == MAX_JOBS) {
       next_job = 0;
    }
@@ -137,6 +138,7 @@ int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *jobq_poo
    chosen_job_q->jobs[chosen_job_q->tail] = new_fd;
    chosen_job_q->count++;
    chosen_job_q->tail = next_job;
+   pthread_cond_signal(&(chosen_job_q->signal));
   }
 }
 
