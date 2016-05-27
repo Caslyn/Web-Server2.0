@@ -14,9 +14,6 @@
 #include <unistd.h>
 #include "headerfile.h"
 
-#define BACKLOG 10
-#define PORT "5000" // the port clients will be connecting to
-
 static void *get_client_addr(struct sockaddr *);
 static struct addrinfo hints, *servinfo, *p;
 static struct sockaddr_storage client_addr; // clients address information
@@ -28,14 +25,6 @@ static void *get_client_addr(struct sockaddr *sa) {
      return &(((struct sockaddr_in*) sa)->sin_addr);
   }
   return &(((struct sockaddr_in6*) sa)->sin6_addr);
-}
-
-static void sigchld_handler(int s) {
-  // waitpid() might overwrite errno, so we save and restor it:
-  int saved_errno = errno;
-  while(waitpid(-1, NULL, WNOHANG) > 0);
-
-  errno = saved_errno;
 }
 
 int create_socket(void){
@@ -89,28 +78,18 @@ int create_socket(void){
 }
 
 int begin_listening(int sockfd){
-  struct sigaction sa; // signal struct
 
   if (listen(sockfd, BACKLOG) == -1) {
     perror("listen");
     return -1;
   }
 
-  sa.sa_handler = sigchld_handler; // reap zombie processes
-  sigemptyset(&sa.sa_mask); // initiazes the signal to be empty
-  sa.sa_flags = SA_RESTART; // restart the system call if possible
-
-  if(sigaction(SIGCHLD, &sa, NULL) == -1) {
-     perror("sigaction");
-     return -1;
-  }
-
   printf("server: waiting for connection...\n");
   return 0;
 }
 // distribute connections to job queues
-int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *jobq_pool){
-  int new_fd, next_job_q, next_job;
+int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *job_q_pool){
+  int new_fd, next_job_q, next_job, c;
   job_queue *chosen_job_q;
 
   while(1) {
@@ -122,13 +101,13 @@ int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *jobq_poo
       continue;
      }
 
-    next_job_q = jobq_pool->tail + 1; // next available job queue
+    next_job_q = job_q_pool->tail + 1; // next available job queue
 
     if (next_job_q == MAX_THREADS) { // If next is the beyond the number of threads(1:1 with job queues), then assign next jobqueue to first
       next_job_q = 0;
     }
    // add connection to the next available job queue
-   chosen_job_q = &jobq_pool->job_queues[jobq_pool->tail]; 
+   chosen_job_q = &job_q_pool->job_queues[job_q_pool->tail]; 
    next_job = chosen_job_q->tail + 1;
 
    if (next_job == MAX_JOBS) {
@@ -140,6 +119,9 @@ int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *jobq_poo
    chosen_job_q->tail = next_job;
    pthread_cond_signal(&(chosen_job_q->signal));
   }
+
+  clean_up_pools(t_pool, job_q_pool);
+  return 0;
 }
 
 int accept_connection(int sockfd) {

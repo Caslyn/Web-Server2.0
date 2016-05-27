@@ -1,6 +1,6 @@
 /* request.c */
-#define HEADER_LEN 4096
-#define CONTENT_LEN 4096
+#define HEADER_LEN 1024
+#define CONTENT_LEN 1024
 
 typedef struct req {
    char *url;
@@ -40,17 +40,12 @@ typedef struct thread_pool {
   pthread_t *threads; // threads in thread pool
 } thread_pool;
 
-typedef struct thread_info {
-  job_queue *job_q;
-  thread_pool *t_pool;
-} thread_info;
-
-thread_pool *build_thread_pool(job_queue_pool *jobq_pool);
-void init_worker_thread(thread_info *t_info);
+thread_pool *build_thread_pool(job_queue_pool *);
 job_queue_pool *build_jobq_pool(void);
 
 void goto_sleep(job_queue *);
 void wake_up(job_queue *);
+void clean_up_pools(thread_pool*, job_queue_pool *);
 
 /* poll.c */
 #define TRUE 1
@@ -58,6 +53,8 @@ void wake_up(job_queue *);
 void poll_wait(int, int);
 
 /* socket.c */
+#define BACKLOG 10
+#define PORT "5000"
 int create_socket(void);
 int begin_listening(int);
 int distr_connections(int, thread_pool *, job_queue_pool *);
