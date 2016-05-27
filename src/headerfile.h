@@ -11,15 +11,17 @@ int serve_request(int);
 int read_request(int, req *);
 int parse_headers(req *);
 int write_response(int, req *);
-int send_file(int, int);
+int send_file(int, int, off_t, char*);
+void send_response_headers(int, off_t, char *, char *);
+char *get_file_type(char *);
 
 /* thread.c */
 #include <pthread.h>
-#define MAX_THREADS 1
-#define MAX_CONNECTIONS 5
+#define MAX_THREADS 5
+#define MAX_CONNECTIONS 25
 #define MAX_JOBS 5
 
-typedef struct job_queue {  
+typedef struct job_queue {
   pthread_t tid; // thread id each queue belongs to
   int *jobs;
   int head;

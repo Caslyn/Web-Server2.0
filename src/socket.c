@@ -106,8 +106,10 @@ int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *job_q_po
     if (next_job_q == MAX_THREADS) { // If next is the beyond the number of threads(1:1 with job queues), then assign next jobqueue to first
       next_job_q = 0;
     }
+    job_q_pool->tail = next_job_q;
    // add connection to the next available job queue
    chosen_job_q = &job_q_pool->job_queues[job_q_pool->tail]; 
+   // next available job spot in chosen job queue
    next_job = chosen_job_q->tail + 1;
 
    if (next_job == MAX_JOBS) {

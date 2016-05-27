@@ -39,7 +39,7 @@ int read_request(int sockfd, req *req){
    int bytes_recv, cp = 0;
    char content_buf[CONTENT_LEN];
    size_t initial_len = CONTENT_LEN;
-   req->content = (char *) malloc(initial_len);
+   req->content = (char *) calloc(1, initial_len);
    poll_wait(sockfd, POLLIN);
    while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > 0) {
      printf("%d bytes have been read\n", bytes_recv);
@@ -83,30 +83,36 @@ int parse_headers(req *req) {
      memcpy(req->url, s, e-s);
      return 0;
  }
-  int write_response(int sockfd, req *req){
-    int file;
-    char real_path[HEADER_LEN];
-    realpath(req->url, real_path);
-    printf("URL: %s\n", real_path);
 
-    // could not open file
-    if ((file = open(real_path, O_RDONLY)) < 0) {
-      printf("File Not Found\n\n");
-      file = open("notfound.html", O_RDONLY);
-      send_file(file, sockfd);
-    } else {
-      printf("Sending Request File\n"); 
-      send_file(file, sockfd);
-    } 
-    return 0;
-  }
+int write_response(int sockfd, req *req){
+  int file;
+  struct stat st;
+ 
+  char real_path[HEADER_LEN];
+  realpath(req->url, real_path);
+  printf("URL: %s\n", real_path);
 
-int send_file(int file, int sockfd) {
-   struct stat st;
-   fstat(file, &st);
-   off_t offset = 0, size, original_size = st.st_size;
+  if ((file = open(real_path, O_RDONLY)) < 0) {
+    printf("File Not Found\n\n");
+    file = open("notfound.html", O_RDONLY);
+    fstat(file, &st);
+    off_t size = st.st_size;  
+    send_response_headers(sockfd, size, "404 Not Found", get_file_type(req->url));
+    send_file(file, sockfd, size, req->url);
+  } else {
+    printf("Sending Request File\n");
+    fstat(file, &st);
+    off_t size = st.st_size;  
+    send_response_headers(sockfd, size, "200 OK", get_file_type(req->url));
+    send_file(file, sockfd, size, req->url); }
+  return 0;
+}
+
+int send_file(int file, int sockfd, off_t original_size, char *ext) {
+   off_t offset = 0;
    int complete = FALSE;
-   size = original_size;
+   off_t size = original_size;
+
    while(complete == FALSE) {
       if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
          if (errno == EWOULDBLOCK) {
@@ -120,11 +126,25 @@ int send_file(int file, int sockfd) {
           return 1;
          }
       } else {
-        printf("Done sending file\n");
         complete = TRUE;
-      } 
+      }
    }
-
    close(file);
    return offset;
+}
+
+char *get_file_type(char *url) {
+  char *ext = strchr(url, '.');
+  if (!strcmp(ext, ".png")) {
+   return "image/png";
+  } else {
+  return "text/html";
+  }
+}
+
+void send_response_headers(int sockfd, off_t content_size, char *status, char *ext) {
+  char header_buf[HEADER_LEN];
+  sprintf(header_buf, "HTTP/1.1 %s\nContent-Type:%s\nContent-Length:%lld\n\n", status, ext, content_size);
+  printf("%s", header_buf);
+  send(sockfd, header_buf, strlen(header_buf), 0);
 }
