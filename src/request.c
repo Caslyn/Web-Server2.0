@@ -1,6 +1,6 @@
-#include <errno.h>
-#include <ctype.h>
-#include <netinet/in.h>
+#include <errno.h> 
+#include <ctype.h> 
+#include <netinet/in.h> 
 #include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
@@ -40,7 +40,7 @@ int read_request(int sockfd, req *req){
    char content_buf[CONTENT_LEN];
    size_t initial_len = CONTENT_LEN;
    req->content = (char *) malloc(initial_len);
-   printf("about to read request on %d\n", sockfd);
+   poll_wait(sockfd, POLLIN);
    while ((bytes_recv = recv(sockfd, content_buf, CONTENT_LEN, 0)) > 0) {
      printf("%d bytes have been read\n", bytes_recv);
      if (bytes_recv + cp >= initial_len) { // exceed storage allocation capacity
@@ -104,21 +104,23 @@ int parse_headers(req *req) {
 int send_file(int file, int sockfd) {
    struct stat st;
    fstat(file, &st);
-   off_t offset = 0, size = st.st_size;
+   off_t offset = 0, size, original_size = st.st_size;
    int complete = FALSE;
-
+   size = original_size;
    while(complete == FALSE) {
       if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
          if (errno == EWOULDBLOCK) {
            printf("Wrote %zd bytes to socket\n", size);
            offset+=size;
-           poll_wait(sockfd, POLLOUT | POLLERR);
+           size = original_size; // reset size to original size, since the num of bytes sent is stored in this param
+           poll_wait(sockfd, POLLOUT | POLLWRBAND);
            continue;
          } else {
           perror("sendfile");
           return 1;
-         } 
+         }
       } else {
+        printf("Done sending file\n");
         complete = TRUE;
       } 
    }
