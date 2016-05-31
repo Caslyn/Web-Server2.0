@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/event.h>
 #include <sys/poll.h>
 #include "headerfile.h"
 
@@ -13,7 +15,6 @@ thread_pool *build_thread_pool(job_queue_pool *jobq_pool) {
 
    for (i = 0; i < MAX_THREADS; i++) {
       job_q = &jobq_pool->job_queues[i];
-      // create new thread and place it in a wait state
       if(pthread_create(&(t_pool->threads[i]), NULL, (void *) goto_sleep, job_q) != 0) {
          //pthread does not set errno, so use return value of pthread_join
          printf("Error Creating Thread: %i", pthread_join(t_pool->threads[i], NULL));
@@ -24,18 +25,18 @@ thread_pool *build_thread_pool(job_queue_pool *jobq_pool) {
 }
 
 void goto_sleep(job_queue *job_q) {
-  while(1) {
-     while(job_q->count == 0) {
-       printf("Thread %p Waiting for Work.\n", pthread_self());
-       pthread_cond_wait(&(job_q->signal),&(job_q->thread_lock));   
-     }
-     wake_up(job_q);
-  }
+  job_q->kq = kqueue();
+  kevent(job_q->kq, &job_q->ke, 1, NULL, 0,  NULL);
+    while(job_q->count == 0) {
+      kevent(job_q->kq, NULL, 0, &job_q->ke, 1, NULL); // this eventually blocks other reqs
+      memset(&job_q->ke, 0, sizeof(struct kevent));
+    }
+  wake_up(job_q);
 }
 
 void wake_up(job_queue *job_q) {
     int job = job_q->jobs[job_q->head++]; // get next job from job queue
-
+    printf("Waking up Thread %p\n", pthread_self());
     if (job_q->head == MAX_JOBS) {
        job_q->head = 0;
     }
@@ -56,8 +57,6 @@ job_queue_pool *build_jobq_pool() {
    // allocate storage for all job queues for all threads
    for(i = 0; i < MAX_THREADS; i++) {
       job_q = (job_queue *) calloc(1, sizeof(job_queue));
-      pthread_mutex_init(&(job_q->thread_lock), NULL); //initialize mutex to create exclusive access
-      pthread_cond_init(&(job_q->signal), NULL); // initialize conditional variable 
       job_q->jobs = (int *) malloc(MAX_JOBS);
       job_q_pool->job_queues[i] = *job_q;
    }
@@ -67,7 +66,6 @@ job_queue_pool *build_jobq_pool() {
 void clean_up_pools(thread_pool *t_pool, job_queue_pool *job_q_pool) { 
   job_queue *job_q;
   int i;
-  printf("Cleaning up threads & job queues\n");
    for (i = 0; i < MAX_THREADS; i++) {
       pthread_join(t_pool->threads[i], NULL);
       free(job_q_pool->job_queues[i].jobs);

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/event.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -53,12 +54,6 @@ int create_socket(void){
        perror("setsockopt");
          continue;
      }
-     // set socket to non-blocking
-     if (fcntl(sockfd, F_SETFL, O_NONBLOCK) < 0) {
-        close(sockfd);
-        perror("fcntl");
-        continue;
-     }
 
      if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
         close(sockfd);
@@ -89,7 +84,7 @@ int begin_listening(int sockfd){
 }
 // distribute connections to job queues
 int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *job_q_pool){
-  int new_fd, next_job_q, next_job, c;
+  int new_fd, next_job_q, next_job;
   job_queue *chosen_job_q;
 
   while(1) {
@@ -100,7 +95,6 @@ int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *job_q_po
     if((new_fd = accept_connection(sockfd)) < 0) {
       continue;
      }
-
     next_job_q = job_q_pool->tail + 1; // next available job queue
 
     if (next_job_q == MAX_THREADS) { // If next is the beyond the number of threads(1:1 with job queues), then assign next jobqueue to first
@@ -118,8 +112,11 @@ int distr_connections (int sockfd, thread_pool *t_pool, job_queue_pool *job_q_po
    // add new_sockfd to the end of the chosen job queue
    chosen_job_q->jobs[chosen_job_q->tail] = new_fd;
    chosen_job_q->count++;
+   EV_SET(&chosen_job_q->ke, chosen_job_q->jobs[chosen_job_q->tail], EVFILT_READ, EV_ADD, 0, 0, NULL); 
+   if (kevent(chosen_job_q->kq, &chosen_job_q->ke, 1, NULL, 0,  NULL) < 0) {
+      perror("signal kevent");
+   }
    chosen_job_q->tail = next_job;
-   pthread_cond_signal(&(chosen_job_q->signal));
   }
 
   clean_up_pools(t_pool, job_q_pool);

@@ -1,4 +1,5 @@
 /* request.c */
+#include <sys/types.h>
 #define HEADER_LEN 1024
 #define CONTENT_LEN 1024
 
@@ -17,6 +18,7 @@ char *get_file_type(char *);
 
 /* thread.c */
 #include <pthread.h>
+#include <sys/event.h>
 #define MAX_THREADS 5
 #define MAX_CONNECTIONS 25
 #define MAX_JOBS 5
@@ -27,8 +29,8 @@ typedef struct job_queue {
   int head;
   int tail;
   int count;
-  pthread_mutex_t thread_lock;
-  pthread_cond_t signal;
+  struct kevent ke;
+  int kq;
 } job_queue;
 
 typedef struct job_queue_pool {

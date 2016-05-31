@@ -19,7 +19,7 @@ int serve_request(int sockfd)
   req *req= malloc(sizeof(req));
 
   if((rc = read_request(sockfd, req)) <= 0) { // quit if we didn't read any bytes
-    printf("Couldn't read any bytes\n");
+    close(sockfd);
     free(req->content);
     free(req);
     return -1;
@@ -28,6 +28,7 @@ int serve_request(int sockfd)
     parse_headers(req); 
     write_response(sockfd, req);
     // clean up
+    close(sockfd);
     free(req->url);
     free(req->content);
     free(req);
@@ -85,33 +86,31 @@ int parse_headers(req *req) {
  }
 
 int write_response(int sockfd, req *req){
+  char real_path[HEADER_LEN];
   int file;
   struct stat st;
- 
-  char real_path[HEADER_LEN];
+  off_t size;
+
   realpath(req->url, real_path);
   printf("URL: %s\n", real_path);
 
   if ((file = open(real_path, O_RDONLY)) < 0) {
-    printf("File Not Found\n\n");
-    file = open("notfound.html", O_RDONLY);
+    file = open("./assets/notfound.html", O_RDONLY);
     fstat(file, &st);
-    off_t size = st.st_size;  
-    send_response_headers(sockfd, size, "404 Not Found", get_file_type(req->url));
+    size = st.st_size;
+    send_response_headers(sockfd, size, "404 Not Found", get_file_type(".html"));
     send_file(file, sockfd, size, req->url);
   } else {
-    printf("Sending Request File\n");
     fstat(file, &st);
-    off_t size = st.st_size;  
+    size = st.st_size;
     send_response_headers(sockfd, size, "200 OK", get_file_type(req->url));
     send_file(file, sockfd, size, req->url); }
   return 0;
 }
 
 int send_file(int file, int sockfd, off_t original_size, char *ext) {
-   off_t offset = 0;
+   off_t offset = 0, size = original_size;
    int complete = FALSE;
-   off_t size = original_size;
 
    while(complete == FALSE) {
       if (sendfile(file, sockfd, offset, &size, 0,0) < 0) {
@@ -135,7 +134,7 @@ int send_file(int file, int sockfd, off_t original_size, char *ext) {
 
 char *get_file_type(char *url) {
   char *ext = strchr(url, '.');
-  if (!strcmp(ext, ".png")) {
+  if (ext && !strcmp(ext, ".png")) {
    return "image/png";
   } else {
   return "text/html";
